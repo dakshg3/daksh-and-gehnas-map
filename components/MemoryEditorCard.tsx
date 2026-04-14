@@ -1,26 +1,32 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
+import { memo, useMemo, useState } from "react";
 import type { Memory } from "./types";
 import { Card, Pill } from "./ui";
 import dynamic from "next/dynamic";
 import { LocationSearch } from "./LocationSearch";
 
-const MapView = dynamic(() => import("./MapView").then((m) => m.MapView), { ssr: false });
+const MapView = dynamic(() => import("./MapView").then((m) => m.MapView), {
+  ssr: false,
+  loading: () => (
+    <div className="h-56 animate-pulse rounded-2xl bg-white/55 ring-1 ring-white/60" />
+  ),
+});
 
-export function MemoryEditorCard({
+function MemoryEditorCardComponent({
   memory,
   onChange,
   onResetToOriginal,
 }: {
   memory: Memory;
-  onChange: (next: Memory) => void;
-  onResetToOriginal?: () => void;
+  onChange: (id: string, next: Memory) => void;
+  onResetToOriginal?: (id: string) => void;
 }) {
   const missingDate = !memory.date;
   const missingLoc = memory.latitude == null || memory.longitude == null;
   const missingName = !memory.locationName;
+  const [isMapOpen, setIsMapOpen] = useState(false);
 
   const miniMem = useMemo(
     () => [
@@ -65,7 +71,9 @@ export function MemoryEditorCard({
               <input
                 type="date"
                 value={memory.date}
-                onChange={(e) => onChange({ ...memory, date: e.target.value })}
+                onChange={(e) =>
+                  onChange(memory.id, { ...memory, date: e.target.value })
+                }
                 className={
                   "w-full rounded-2xl bg-white/70 px-3 py-2 text-sm ring-1 ring-white/60 focus:outline-none focus:ring-2 focus:ring-violet-300 " +
                   (missingDate ? "ring-2 ring-amber-300" : "")
@@ -77,7 +85,9 @@ export function MemoryEditorCard({
               <div className="mb-1 text-xs font-medium text-zinc-700">Caption</div>
               <input
                 value={memory.caption}
-                onChange={(e) => onChange({ ...memory, caption: e.target.value })}
+                onChange={(e) =>
+                  onChange(memory.id, { ...memory, caption: e.target.value })
+                }
                 placeholder="A tiny note you’ll smile at later…"
                 className="w-full rounded-2xl bg-white/70 px-3 py-2 text-sm ring-1 ring-white/60 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-300"
               />
@@ -89,7 +99,7 @@ export function MemoryEditorCard({
             <LocationSearch
               value={memory.locationName}
               onPick={(name, lat, lon) =>
-                onChange({
+                onChange(memory.id, {
                   ...memory,
                   locationName: name,
                   latitude: lat,
@@ -99,19 +109,37 @@ export function MemoryEditorCard({
             />
           </div>
 
-          <div className="h-56">
-            <MapView
-              key={memory.id}
-              memories={miniMem}
-              onPickLocation={(lat, lon) =>
-                onChange({
-                  ...memory,
-                  latitude: lat,
-                  longitude: lon,
-                  locationName: memory.locationName || "",
-                })
-              }
-            />
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-xs font-medium text-zinc-700">Mini map</div>
+              <button
+                type="button"
+                onClick={() => setIsMapOpen((v) => !v)}
+                className="inline-flex items-center rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-zinc-700 ring-1 ring-white/60 hover:bg-white"
+              >
+                {isMapOpen ? "Hide map" : "Open map"}
+              </button>
+            </div>
+            {isMapOpen ? (
+              <div className="h-56">
+                <MapView
+                  key={memory.id}
+                  memories={miniMem}
+                  onPickLocation={(lat, lon) =>
+                    onChange(memory.id, {
+                      ...memory,
+                      latitude: lat,
+                      longitude: lon,
+                      locationName: memory.locationName || "",
+                    })
+                  }
+                />
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-white/60 px-3 py-2 text-xs text-zinc-600 ring-1 ring-white/60">
+                Open the map when you want to drop or adjust a pin.
+              </div>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -121,7 +149,7 @@ export function MemoryEditorCard({
                 inputMode="decimal"
                 value={memory.latitude ?? ""}
                 onChange={(e) =>
-                  onChange({
+                  onChange(memory.id, {
                     ...memory,
                     latitude: e.target.value ? Number(e.target.value) : null,
                   })
@@ -138,7 +166,7 @@ export function MemoryEditorCard({
                 inputMode="decimal"
                 value={memory.longitude ?? ""}
                 onChange={(e) =>
-                  onChange({
+                  onChange(memory.id, {
                     ...memory,
                     longitude: e.target.value ? Number(e.target.value) : null,
                   })
@@ -158,7 +186,7 @@ export function MemoryEditorCard({
             <button
               type="button"
               className="inline-flex items-center rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-zinc-700 ring-1 ring-white/60 hover:bg-white"
-              onClick={onResetToOriginal}
+              onClick={() => onResetToOriginal(memory.id)}
             >
               Reset to original metadata
             </button>
@@ -168,3 +196,11 @@ export function MemoryEditorCard({
     </Card>
   );
 }
+
+export const MemoryEditorCard = memo(
+  MemoryEditorCardComponent,
+  (prev, next) =>
+    prev.memory === next.memory &&
+    prev.onChange === next.onChange &&
+    prev.onResetToOriginal === next.onResetToOriginal
+);

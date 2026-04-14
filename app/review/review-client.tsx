@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Memory } from "@/components/types";
 import { MemoryEditorCard } from "@/components/MemoryEditorCard";
 import { DownloadButton } from "@/components/DownloadButton";
@@ -13,6 +13,23 @@ import {
 } from "@/components/memoryDraft";
 
 type MemoriesJson = Memory[];
+const INITIAL_VISIBLE_CARDS = 28;
+const LOAD_MORE_STEP = 28;
+const AUTOSAVE_DEBOUNCE_MS = 450;
+
+function withDerivedState(memory: Memory) {
+  const needsReview =
+    !memory.date ||
+    memory.latitude == null ||
+    memory.longitude == null ||
+    !memory.locationName;
+
+  return {
+    ...memory,
+    needsReview,
+    isEdited: isEditedComparedToDetected(memory),
+  };
+}
 
 export function ReviewClient() {
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -20,20 +37,8 @@ export function ReviewClient() {
   const [reloadKey, setReloadKey] = useState(0);
   const [autosavedAt, setAutosavedAt] = useState<number | null>(null);
   const [usingLocalDraft, setUsingLocalDraft] = useState(false);
-
-  function withDerivedState(memory: Memory) {
-    const needsReview =
-      !memory.date ||
-      memory.latitude == null ||
-      memory.longitude == null ||
-      !memory.locationName;
-
-    return {
-      ...memory,
-      needsReview,
-      isEdited: isEditedComparedToDetected(memory),
-    };
-  }
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_CARDS);
+  const [showNeedsReviewOnly, setShowNeedsReviewOnly] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -72,11 +77,13 @@ export function ReviewClient() {
         // Keep the initial load order stable so editing fields doesn't reshuffle
         // cards and trigger Leaflet map container reuse races.
         setMemories(derivedWithDraft);
+        setVisibleCount(INITIAL_VISIBLE_CARDS);
         setUsingLocalDraft(Boolean(draft?.length));
         setStatus("ready");
       } catch {
         if (!alive) return;
         setMemories([]);
+        setVisibleCount(INITIAL_VISIBLE_CARDS);
         setStatus("error");
       }
     };
@@ -90,11 +97,30 @@ export function ReviewClient() {
 
   useEffect(() => {
     if (status !== "ready") return;
-    saveDraftMemories(memories);
-    setAutosavedAt(Date.now());
+
+    const timer = window.setTimeout(() => {
+      saveDraftMemories(memories);
+      setAutosavedAt(Date.now());
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
   }, [memories, status]);
 
   const sorted = memories;
+  const filtered = useMemo(
+    () =>
+      showNeedsReviewOnly
+        ? sorted.filter((m) => m.needsReview)
+        : sorted,
+    [showNeedsReviewOnly, sorted]
+  );
+  const visibleMemories = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  );
+  const remainingCount = Math.max(0, filtered.length - visibleMemories.length);
 
   const needsCount = useMemo(
     () => sorted.filter((m) => m.needsReview).length,
@@ -105,6 +131,39 @@ export function ReviewClient() {
     () => sorted.filter((m) => m.isEdited).length,
     [sorted]
   );
+
+  const update = useCallback((id: string, next: Memory) => {
+    setMemories((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        const merged = {
+          ...next,
+          detectedDate: next.detectedDate ?? m.detectedDate ?? "",
+          detectedLatitude: next.detectedLatitude ?? m.detectedLatitude ?? null,
+          detectedLongitude: next.detectedLongitude ?? m.detectedLongitude ?? null,
+          detectedLocationName: next.detectedLocationName ?? m.detectedLocationName ?? "",
+        };
+        return withDerivedState(merged);
+      })
+    );
+  }, []);
+
+  const resetToDetected = useCallback((id: string) => {
+    setMemories((prev) =>
+      prev.map((m) => {
+        if (m.id !== id) return m;
+        return withDerivedState({
+          ...m,
+          date: m.detectedDate ?? "",
+          latitude: m.detectedLatitude ?? null,
+          longitude: m.detectedLongitude ?? null,
+          locationName: m.detectedLocationName ?? "",
+          caption: "",
+          isEdited: false,
+        });
+      })
+    );
+  }, []);
 
   if (status === "loading") {
     return (
@@ -140,39 +199,6 @@ export function ReviewClient() {
     );
   }
 
-  function update(id: string, next: Memory) {
-    setMemories((prev) =>
-      prev.map((m) => {
-        if (m.id !== id) return m;
-        const merged = {
-          ...next,
-          detectedDate: next.detectedDate ?? m.detectedDate ?? "",
-          detectedLatitude: next.detectedLatitude ?? m.detectedLatitude ?? null,
-          detectedLongitude: next.detectedLongitude ?? m.detectedLongitude ?? null,
-          detectedLocationName: next.detectedLocationName ?? m.detectedLocationName ?? "",
-        };
-        return withDerivedState(merged);
-      })
-    );
-  }
-
-  function resetToDetected(id: string) {
-    setMemories((prev) =>
-      prev.map((m) => {
-        if (m.id !== id) return m;
-        return withDerivedState({
-          ...m,
-          date: m.detectedDate ?? "",
-          latitude: m.detectedLatitude ?? null,
-          longitude: m.detectedLongitude ?? null,
-          locationName: m.detectedLocationName ?? "",
-          caption: "",
-          isEdited: false,
-        });
-      })
-    );
-  }
-
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -189,8 +215,28 @@ export function ReviewClient() {
             Autosave: {autosavedAt ? "saved locally" : "waiting"}
             {usingLocalDraft ? " (loaded local draft)" : ""}
           </div>
+          <div className="text-xs text-zinc-500">
+            Showing {visibleMemories.length} of {filtered.length}
+            {showNeedsReviewOnly ? " needing review" : " photos"}
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowNeedsReviewOnly((v) => !v);
+              setVisibleCount(INITIAL_VISIBLE_CARDS);
+            }}
+            className={
+              "inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium shadow-sm ring-1 backdrop-blur " +
+              (showNeedsReviewOnly
+                ? "bg-violet-500 text-white ring-violet-400 hover:bg-violet-600"
+                : "bg-white/70 text-zinc-700 ring-white/50 hover:bg-white/90")
+            }
+            aria-pressed={showNeedsReviewOnly}
+          >
+            {showNeedsReviewOnly ? "Showing: Needs review" : "Filter: Needs review"}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -206,16 +252,38 @@ export function ReviewClient() {
         </div>
       </div>
 
+      {!visibleMemories.length && showNeedsReviewOnly ? (
+        <div className="mb-4 rounded-3xl bg-white/75 p-5 text-sm text-zinc-700 ring-1 ring-white/70">
+          Everything looks good. No photos currently need review.
+        </div>
+      ) : null}
+
       <div className="space-y-4">
-        {sorted.map((m) => (
+        {visibleMemories.map((m) => (
           <MemoryEditorCard
             key={m.id}
             memory={m}
-            onChange={(next) => update(m.id, next)}
-            onResetToOriginal={() => resetToDetected(m.id)}
+            onChange={update}
+            onResetToOriginal={resetToDetected}
           />
         ))}
       </div>
+
+      {remainingCount > 0 ? (
+        <div className="mt-4 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() =>
+              setVisibleCount((count) =>
+                Math.min(count + LOAD_MORE_STEP, filtered.length)
+              )
+            }
+            className="inline-flex items-center rounded-full bg-white/80 px-5 py-2.5 text-sm font-medium text-zinc-800 ring-1 ring-white/70 hover:bg-white"
+          >
+            Load more ({remainingCount} remaining)
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-8 text-center text-sm text-zinc-600">
         Edits are autosaved in this browser. Use download when you want to

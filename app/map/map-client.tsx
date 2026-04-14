@@ -13,6 +13,7 @@ import { applyDraftToMemories, loadDraftMemories } from "@/components/memoryDraf
 const MapView = dynamic(() => import("@/components/MapView").then((m) => m.MapView), { ssr: false });
 
 type MemoriesJson = Memory[];
+const CLUSTER_DISTANCE_METERS = 900;
 
 export function MapClient() {
   const [memories, setMemories] = useState<Memory[]>([]);
@@ -59,7 +60,7 @@ export function MapClient() {
   }, [memories, timelineStart, timelineEnd]);
 
   const clustered = useMemo<MemoryCluster[]>(
-    () => clusterMemoriesByDistance(filtered, 220),
+    () => clusterMemoriesByDistance(filtered, CLUSTER_DISTANCE_METERS),
     [filtered]
   );
 
@@ -67,6 +68,12 @@ export function MapClient() {
     () => clustered.find((c) => c.locationId === selectedLocationId),
     [clustered, selectedLocationId]
   );
+
+  useEffect(() => {
+    if (!selectedLocationId) return;
+    if (selectedCluster) return;
+    setSelectedLocationId(undefined);
+  }, [selectedCluster, selectedLocationId]);
 
   if (status === "loading") {
     return (
@@ -127,7 +134,7 @@ export function MapClient() {
             selectedId={selectedLocationId}
             onSelect={(locationId) => setSelectedLocationId(locationId)}
             groupNearby
-            groupDistanceMeters={220}
+            groupDistanceMeters={CLUSTER_DISTANCE_METERS}
             coupleMode={false}
             posterMode={false}
             className="h-full"
