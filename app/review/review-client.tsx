@@ -33,6 +33,7 @@ function withDerivedState(memory: Memory) {
 
 export function ReviewClient() {
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [baseMemories, setBaseMemories] = useState<Memory[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [reloadKey, setReloadKey] = useState(0);
   const [autosavedAt, setAutosavedAt] = useState<number | null>(null);
@@ -67,6 +68,8 @@ export function ReviewClient() {
           })
           .sort(byDateAsc);
 
+        setBaseMemories(normalized);
+
         const draft = loadDraftMemories();
         const withDraft = applyDraftToMemories(normalized, draft);
         const derivedWithDraft = withDraft.map((m) => {
@@ -82,6 +85,7 @@ export function ReviewClient() {
         setStatus("ready");
       } catch {
         if (!alive) return;
+        setBaseMemories([]);
         setMemories([]);
         setVisibleCount(INITIAL_VISIBLE_CARDS);
         setStatus("error");
@@ -242,7 +246,9 @@ export function ReviewClient() {
             onClick={() => {
               clearDraftMemories();
               setUsingLocalDraft(false);
-              setReloadKey((v) => v + 1);
+              setAutosavedAt(null);
+              setMemories(baseMemories);
+              setVisibleCount(INITIAL_VISIBLE_CARDS);
             }}
             className="inline-flex items-center justify-center rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm ring-1 ring-white/50 backdrop-blur hover:bg-white/90"
           >

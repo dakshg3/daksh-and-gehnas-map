@@ -48,13 +48,16 @@ export function LocationSearch({
 
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => setQ(value), [value]);
 
   const canSearch = useMemo(() => q.trim().length >= 2, [q]);
 
-  const runSearch = useCallback(async (query: string, limit = resultLimit) => {
+  const runSearch = useCallback(async (query: string, limit: number) => {
     if (query.trim().length < 2) return;
+
+    const requestId = ++requestIdRef.current;
 
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -98,7 +101,6 @@ export function LocationSearch({
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {
-            "User-Agent": "our-story-map/1.0 (client)",
             "Accept-Language": "en",
           },
         });
@@ -167,6 +169,8 @@ export function LocationSearch({
         merged = [...merged, ...photonPass];
       }
 
+      if (requestId !== requestIdRef.current) return;
+
       setOpts(merged.slice(0, limit));
 
       if (!merged.length && hadProviderError) {
@@ -174,15 +178,21 @@ export function LocationSearch({
       }
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
+      if (requestId !== requestIdRef.current) return;
       setOpts([]);
       setErrorMsg("Could not search right now. Try again in a moment.");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [resultLimit]);
+  }, []);
 
   useEffect(() => {
     if (!canSearch) {
+      abortRef.current?.abort();
+      requestIdRef.current += 1;
+      setLoading(false);
       setOpts([]);
       setHasSearched(false);
       setErrorMsg("");
@@ -203,6 +213,7 @@ export function LocationSearch({
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+      requestIdRef.current += 1;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
@@ -247,7 +258,7 @@ export function LocationSearch({
         <div className="mt-2 overflow-hidden rounded-2xl bg-white/70 ring-1 ring-white/60">
           {opts.map((o) => (
             <button
-              key={`${o.lat},${o.lon}`}
+              key={`${o.display_name}|${o.lat},${o.lon}`}
               className="block w-full px-3 py-2 text-left text-sm hover:bg-white/80"
               type="button"
               onClick={() =>
@@ -264,7 +275,6 @@ export function LocationSearch({
               onClick={() => {
                 const nextLimit = Math.min(MAX_LIMIT, resultLimit + 6);
                 setResultLimit(nextLimit);
-                void runSearch(q.trim(), nextLimit);
               }}
             >
               Show more options
