@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f5f1ff;
+  --foreground: #15161a;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-playfair);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+}
+
+.romantic-map .leaflet-tile {
+  filter: saturate(0.55) grayscale(0.3) brightness(1.06) contrast(0.9);
+}
+
+.minimal-map .leaflet-tile {
+  filter: saturate(0.35) grayscale(0.16) brightness(1.03) contrast(0.95);
+}
+
+.poster-map {
+  background: #ececeb;
+}
+
+.poster-map .leaflet-control-zoom {
+  display: none;
+}
+
+.poster-map .leaflet-container {
+  background: #ececeb;
+}
+
+.poster-map .leaflet-tile {
+  filter: saturate(0.08) grayscale(0.98) brightness(1.26) contrast(0.58);
+  opacity: 0.9;
+}
+
+.poster-map .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  margin: 0.5rem;
+  padding: 0.1rem 0.4rem;
+}
+
+.map-poster-shell {
+  background:
+    radial-gradient(circle at 20% 8%, rgba(255, 255, 255, 0.95), rgba(246, 246, 245, 0.86) 44%, rgba(240, 240, 239, 0.8) 100%),
+    linear-gradient(180deg, #f5f5f4 0%, #ececeb 100%);
+}
+
+.map-poster-shell .floral-spray,
+.map-poster-shell .floral-petal-dust {
+  opacity: 0.18;
+}
+
+.timeline-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #8b5cf6;
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.45);
+}
+
+.timeline-range::-moz-range-thumb {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #8b5cf6;
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.45);
+}
+
+.timeline-range::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.timeline-range::-moz-range-track {
+  background: transparent;
+}
+
+.romantic-map .leaflet-control-zoom {
+  border: 0;
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.45);
+}
+
+.heart-pin-wrapper .heart-pin:hover {
+  transform: scale(1.1) translateY(-1px);
+  box-shadow: 0 16px 30px -14px rgba(17, 24, 39, 0.7), 0 0 24px rgba(167, 139, 250, 0.48);
+}
+
+.floral-spray {
+  background-image: url("/lavender-flowers.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.floral-petal-dust {
+  background-image:
+    radial-gradient(circle at 12% 38%, rgba(196, 181, 253, 0.65) 0, rgba(196, 181, 253, 0.65) 8px, transparent 9px),
+    radial-gradient(circle at 30% 62%, rgba(221, 214, 254, 0.55) 0, rgba(221, 214, 254, 0.55) 7px, transparent 8px),
+    radial-gradient(circle at 54% 30%, rgba(233, 213, 255, 0.6) 0, rgba(233, 213, 255, 0.6) 9px, transparent 10px),
+    radial-gradient(circle at 76% 56%, rgba(196, 181, 253, 0.5) 0, rgba(196, 181, 253, 0.5) 6px, transparent 7px),
+    radial-gradient(circle at 90% 22%, rgba(221, 214, 254, 0.55) 0, rgba(221, 214, 254, 0.55) 7px, transparent 8px);
+  background-repeat: no-repeat;
+}
+
+.floral-float {
+  animation: floral-float 7.5s ease-in-out infinite;
+}
+
+.floral-float-delayed {
+  animation: floral-float 8.5s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+
+.floral-float-slow {
+  animation: floral-float-slow 11s ease-in-out infinite;
+}
+
+@keyframes floral-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+}
+
+@keyframes floral-float-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(-2deg);
+  }
+}
+
+:root[data-couple-mode="off"] .floral-spray,
+:root[data-couple-mode="off"] .floral-petal-dust {
+  opacity: 0 !important;
+}
+
+:root[data-couple-mode="off"] .floral-float,
+:root[data-couple-mode="off"] .floral-float-delayed,
+:root[data-couple-mode="off"] .floral-float-slow {
+  animation: none !important;
+}
