@@ -20,8 +20,8 @@ function MemoryEditorCardComponent({
   onResetToOriginal,
 }: {
   memory: Memory;
-  onChange: (id: string, next: Memory) => void;
-  onResetToOriginal?: (id: string) => void;
+  onChange: (id: string, file: string, next: Memory) => void;
+  onResetToOriginal?: (id: string, file: string) => void;
 }) {
   const missingDate = !memory.date;
   const missingLoc = memory.latitude == null || memory.longitude == null;
@@ -72,7 +72,7 @@ function MemoryEditorCardComponent({
                 type="date"
                 value={memory.date}
                 onChange={(e) =>
-                  onChange(memory.id, { ...memory, date: e.target.value })
+                  onChange(memory.id, memory.file, { ...memory, date: e.target.value })
                 }
                 className={
                   "w-full rounded-2xl bg-white/70 px-3 py-2 text-sm ring-1 ring-white/60 focus:outline-none focus:ring-2 focus:ring-violet-300 " +
@@ -86,7 +86,7 @@ function MemoryEditorCardComponent({
               <input
                 value={memory.caption}
                 onChange={(e) =>
-                  onChange(memory.id, { ...memory, caption: e.target.value })
+                  onChange(memory.id, memory.file, { ...memory, caption: e.target.value })
                 }
                 placeholder="A tiny note you’ll smile at later…"
                 className="w-full rounded-2xl bg-white/70 px-3 py-2 text-sm ring-1 ring-white/60 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-300"
@@ -99,7 +99,7 @@ function MemoryEditorCardComponent({
             <LocationSearch
               value={memory.locationName}
               onPick={(name, lat, lon) =>
-                onChange(memory.id, {
+                onChange(memory.id, memory.file, {
                   ...memory,
                   locationName: name,
                   latitude: lat,
@@ -126,7 +126,7 @@ function MemoryEditorCardComponent({
                   key={memory.id}
                   memories={miniMem}
                   onPickLocation={(lat, lon) =>
-                    onChange(memory.id, {
+                    onChange(memory.id, memory.file, {
                       ...memory,
                       latitude: lat,
                       longitude: lon,
@@ -149,7 +149,7 @@ function MemoryEditorCardComponent({
                 inputMode="decimal"
                 value={memory.latitude ?? ""}
                 onChange={(e) =>
-                  onChange(memory.id, {
+                  onChange(memory.id, memory.file, {
                     ...memory,
                     latitude: e.target.value ? Number(e.target.value) : null,
                   })
@@ -166,7 +166,7 @@ function MemoryEditorCardComponent({
                 inputMode="decimal"
                 value={memory.longitude ?? ""}
                 onChange={(e) =>
-                  onChange(memory.id, {
+                  onChange(memory.id, memory.file, {
                     ...memory,
                     longitude: e.target.value ? Number(e.target.value) : null,
                   })
@@ -186,7 +186,7 @@ function MemoryEditorCardComponent({
             <button
               type="button"
               className="inline-flex items-center rounded-full bg-white/70 px-3 py-1.5 text-xs font-medium text-zinc-700 ring-1 ring-white/60 hover:bg-white"
-              onClick={() => onResetToOriginal(memory.id)}
+              onClick={() => onResetToOriginal(memory.id, memory.file)}
             >
               Reset to original metadata
             </button>

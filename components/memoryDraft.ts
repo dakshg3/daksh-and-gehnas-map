@@ -2,6 +2,50 @@ import type { Memory } from "./types";
 
 export const MEMORIES_DRAFT_KEY = "dg-memories-draft-v1";
 
+type DraftMemory = Pick<
+  Memory,
+  "id" | "file" | "date" | "latitude" | "longitude" | "locationName" | "caption" | "isEdited"
+>;
+
+function sameCoord(a: number | null | undefined, b: number | null | undefined) {
+  if (a == null && b == null) return true;
+  if (a == null || b == null) return false;
+  return Math.abs(a - b) < 1e-7;
+}
+
+function isEditedInDraft(entry: Memory) {
+  const detectedDate = entry.detectedDate ?? "";
+  const detectedLat = entry.detectedLatitude ?? null;
+  const detectedLon = entry.detectedLongitude ?? null;
+  const detectedLocationName = entry.detectedLocationName ?? "";
+
+  return (
+    (entry.date || "") !== detectedDate ||
+    !sameCoord(entry.latitude, detectedLat) ||
+    !sameCoord(entry.longitude, detectedLon) ||
+    (entry.locationName || "") !== detectedLocationName ||
+    Boolean((entry.caption || "").trim()) ||
+    Boolean(entry.isEdited)
+  );
+}
+
+function draftKey(entry: Pick<Memory, "id" | "file">) {
+  return `${entry.id}|${entry.file}`;
+}
+
+function toDraftMemory(entry: Memory): DraftMemory {
+  return {
+    id: entry.id,
+    file: entry.file,
+    date: entry.date,
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    locationName: entry.locationName,
+    caption: entry.caption,
+    isEdited: entry.isEdited,
+  };
+}
+
 function normalizeMemory(entry: Memory): Memory {
   return {
     ...entry,
@@ -30,7 +74,12 @@ export function saveDraftMemories(memories: Memory[]) {
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(MEMORIES_DRAFT_KEY, JSON.stringify(memories));
+    const draft = memories.filter(isEditedInDraft).map(toDraftMemory);
+    if (!draft.length) {
+      window.localStorage.removeItem(MEMORIES_DRAFT_KEY);
+      return;
+    }
+    window.localStorage.setItem(MEMORIES_DRAFT_KEY, JSON.stringify(draft));
   } catch {
     // Ignore quota/private-mode failures; draft persistence is best-effort.
   }
@@ -48,15 +97,16 @@ export function clearDraftMemories() {
 export function applyDraftToMemories(base: Memory[], draft: Memory[] | null): Memory[] {
   if (!draft?.length) return base;
 
-  const baseById = new Map(base.map((m) => [m.id, m]));
+  const baseById = new Map(base.map((m) => [draftKey(m), m]));
   const used = new Set<string>();
   const merged: Memory[] = [];
 
   for (const draftEntry of draft) {
-    const baseEntry = baseById.get(draftEntry.id);
+    const key = draftKey(draftEntry);
+    const baseEntry = baseById.get(key);
     if (!baseEntry) continue;
 
-    used.add(draftEntry.id);
+    used.add(key);
     merged.push(
       normalizeMemory({
         ...baseEntry,
@@ -66,7 +116,7 @@ export function applyDraftToMemories(base: Memory[], draft: Memory[] | null): Me
   }
 
   for (const baseEntry of base) {
-    if (!used.has(baseEntry.id)) {
+    if (!used.has(draftKey(baseEntry))) {
       merged.push(normalizeMemory(baseEntry));
     }
   }

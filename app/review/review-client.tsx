@@ -46,7 +46,7 @@ export function ReviewClient() {
     const load = async () => {
       setStatus("loading");
       try {
-        const res = await fetch("/data/memories.json", { cache: "no-store" });
+        const res = await fetch("/data/memories.json", { cache: "force-cache" });
         if (!res.ok) throw new Error(`Failed to load memories (${res.status})`);
         const data = (await res.json()) as MemoriesJson;
         if (!alive) return;
@@ -132,10 +132,10 @@ export function ReviewClient() {
     [sorted]
   );
 
-  const update = useCallback((id: string, next: Memory) => {
+  const update = useCallback((id: string, file: string, next: Memory) => {
     setMemories((prev) =>
       prev.map((m) => {
-        if (m.id !== id) return m;
+        if (m.id !== id || m.file !== file) return m;
         const merged = {
           ...next,
           detectedDate: next.detectedDate ?? m.detectedDate ?? "",
@@ -148,10 +148,10 @@ export function ReviewClient() {
     );
   }, []);
 
-  const resetToDetected = useCallback((id: string) => {
+  const resetToDetected = useCallback((id: string, file: string) => {
     setMemories((prev) =>
       prev.map((m) => {
-        if (m.id !== id) return m;
+        if (m.id !== id || m.file !== file) return m;
         return withDerivedState({
           ...m,
           date: m.detectedDate ?? "",
@@ -261,7 +261,7 @@ export function ReviewClient() {
       <div className="space-y-4">
         {visibleMemories.map((m) => (
           <MemoryEditorCard
-            key={m.id}
+            key={`${m.id}|${m.file}`}
             memory={m}
             onChange={update}
             onResetToOriginal={resetToDetected}

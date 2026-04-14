@@ -11,18 +11,13 @@
     "memories:extract": "node scripts/extract-memories.mjs"
   },
   "dependencies": {
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.6.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "leaflet": "^1.9.4",
-    "leaflet.markercluster": "^1.5.3",
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-leaflet": "^5.0.0",
-    "react-leaflet-markercluster": "^5.0.0-rc.0",
-    "three": "^0.183.2"
+    "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

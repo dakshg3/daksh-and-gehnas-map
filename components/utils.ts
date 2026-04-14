@@ -68,7 +68,73 @@ type MutableCluster = {
   latitude: number;
   longitude: number;
   photos: Memory[];
+  cellX: number;
+  cellY: number;
 };
+
+function getCellFor(lat: number, lon: number, cellSizeMeters: number) {
+  const latRad = toRad(lat);
+  const lonRad = toRad(lon);
+
+  // Approximate world position in meters for fast neighborhood bucketing.
+  const xMeters = EARTH_RADIUS_M * lonRad * Math.cos(latRad);
+  const yMeters = EARTH_RADIUS_M * latRad;
+
+  return {
+    cellX: Math.floor(xMeters / cellSizeMeters),
+    cellY: Math.floor(yMeters / cellSizeMeters),
+  };
+}
+
+function cellKey(x: number, y: number) {
+  return `${x}:${y}`;
+}
+
+function addClusterToCell(
+  grid: Map<string, Set<number>>,
+  x: number,
+  y: number,
+  index: number
+) {
+  const key = cellKey(x, y);
+  const bucket = grid.get(key);
+  if (bucket) {
+    bucket.add(index);
+    return;
+  }
+  grid.set(key, new Set([index]));
+}
+
+function removeClusterFromCell(
+  grid: Map<string, Set<number>>,
+  x: number,
+  y: number,
+  index: number
+) {
+  const key = cellKey(x, y);
+  const bucket = grid.get(key);
+  if (!bucket) return;
+  bucket.delete(index);
+  if (!bucket.size) grid.delete(key);
+}
+
+function hashString(input: string) {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 33) ^ input.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildClusterLocationId(cluster: MutableCluster, photos: Memory[]) {
+  const identitySource = photos
+    .map((p) => `${p.id}|${p.file}`)
+    .sort()
+    .join("~");
+  const latBucket = Math.round(cluster.latitude * 1e5);
+  const lonBucket = Math.round(cluster.longitude * 1e5);
+  return `loc-${hashString(identitySource)}-${latBucket}-${lonBucket}`;
+}
 
 function pickClusterLocationName(cluster: MutableCluster) {
   const counts = new Map<string, number>();
@@ -93,43 +159,74 @@ export function clusterMemoriesByDistance(
   memories: Memory[],
   maxDistanceMeters = 220
 ): MemoryCluster[] {
+  const cellSizeMeters = Math.max(1, maxDistanceMeters);
   const withCoords = memories
     .filter((m) => m.latitude != null && m.longitude != null)
     .slice()
     .sort(byDateAsc);
 
   const clusters: MutableCluster[] = [];
+  const grid = new Map<string, Set<number>>();
 
   for (const memory of withCoords) {
     const lat = memory.latitude!;
     const lon = memory.longitude!;
+    const originCell = getCellFor(lat, lon, cellSizeMeters);
 
     let nearestIndex = -1;
     let nearestDistance = Number.POSITIVE_INFINITY;
 
-    for (let i = 0; i < clusters.length; i++) {
-      const c = clusters[i];
+    const candidateIndices = new Set<number>();
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const bucket = grid.get(cellKey(originCell.cellX + dx, originCell.cellY + dy));
+        if (!bucket) continue;
+        for (const idx of bucket) candidateIndices.add(idx);
+      }
+    }
+
+    for (const idx of candidateIndices) {
+      const c = clusters[idx];
       const d = haversineMeters(lat, lon, c.latitude, c.longitude);
       if (d < nearestDistance) {
         nearestDistance = d;
-        nearestIndex = i;
+        nearestIndex = idx;
       }
     }
 
     if (nearestIndex !== -1 && nearestDistance <= maxDistanceMeters) {
       const c = clusters[nearestIndex];
+      const prevCellX = c.cellX;
+      const prevCellY = c.cellY;
+
       c.photos.push(memory);
       const n = c.photos.length;
       c.latitude = c.latitude + (lat - c.latitude) / n;
       c.longitude = c.longitude + (lon - c.longitude) / n;
+
+      const nextCell = getCellFor(c.latitude, c.longitude, cellSizeMeters);
+      if (nextCell.cellX !== prevCellX || nextCell.cellY !== prevCellY) {
+        c.cellX = nextCell.cellX;
+        c.cellY = nextCell.cellY;
+        removeClusterFromCell(grid, prevCellX, prevCellY, nearestIndex);
+        addClusterToCell(grid, c.cellX, c.cellY, nearestIndex);
+      }
     } else {
-      clusters.push({ latitude: lat, longitude: lon, photos: [memory] });
+      const clusterIndex = clusters.length;
+      clusters.push({
+        latitude: lat,
+        longitude: lon,
+        photos: [memory],
+        cellX: originCell.cellX,
+        cellY: originCell.cellY,
+      });
+      addClusterToCell(grid, originCell.cellX, originCell.cellY, clusterIndex);
     }
   }
 
   return clusters.map((cluster) => {
     const photos = cluster.photos.slice().sort(byDateAsc);
-    const locationId = `loc-${photos.map((p) => p.id).sort()[0] ?? "unknown"}`;
+    const locationId = buildClusterLocationId(cluster, photos);
     const locationName = pickClusterLocationName(cluster) || photos[0]?.locationName || "";
 
     return {

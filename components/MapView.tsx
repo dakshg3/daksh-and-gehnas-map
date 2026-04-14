@@ -153,6 +153,7 @@ function hasOverlappingLocation(
 
 export function MapView({
   memories,
+  precomputedClusters,
   selectedId,
   onSelect,
   onPickLocation,
@@ -164,6 +165,7 @@ export function MapView({
   className = "",
 }: {
   memories: Memory[];
+  precomputedClusters?: MemoryCluster[];
   selectedId?: string;
   onSelect?: (locationId: string) => void;
   onPickLocation?: (lat: number, lon: number) => void;
@@ -175,19 +177,21 @@ export function MapView({
   className?: string;
 }) {
   const points = useMemo<MemoryCluster[]>(() => {
+    if (precomputedClusters) return precomputedClusters;
+
     if (groupNearby) {
       return clusterMemoriesByDistance(memories, groupDistanceMeters);
     }
     return memories
       .filter((m) => m.latitude != null && m.longitude != null)
       .map((m) => ({
-        locationId: m.id,
+        locationId: `${m.id}|${m.file}`,
         latitude: m.latitude!,
         longitude: m.longitude!,
         locationName: m.locationName,
         photos: [m],
       }));
-  }, [groupNearby, groupDistanceMeters, memories]);
+  }, [groupNearby, groupDistanceMeters, memories, precomputedClusters]);
   const mapRef = useRef<L.Map | null>(null);
 
   const path = useMemo(() => {

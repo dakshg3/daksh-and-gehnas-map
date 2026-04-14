@@ -7,10 +7,13 @@ import type { Memory, MemoryCluster } from "@/components/types";
 import { Card } from "@/components/ui";
 import { TimelineSlider } from "@/components/TimelineSlider";
 import { byDateAsc, clusterMemoriesByDistance, withinRange } from "@/components/utils";
-import { MemoryModal } from "@/components/MemoryModal";
 import { applyDraftToMemories, loadDraftMemories } from "@/components/memoryDraft";
 
 const MapView = dynamic(() => import("@/components/MapView").then((m) => m.MapView), { ssr: false });
+const MemoryModal = dynamic(
+  () => import("@/components/MemoryModal").then((m) => m.MemoryModal),
+  { ssr: false, loading: () => null }
+);
 
 type MemoriesJson = Memory[];
 const CLUSTER_DISTANCE_METERS = 900;
@@ -29,7 +32,7 @@ export function MapClient() {
     const load = async () => {
       setStatus("loading");
       try {
-        const res = await fetch("/data/memories.json", { cache: "no-store" });
+        const res = await fetch("/data/memories.json", { cache: "force-cache" });
         if (!res.ok) throw new Error(`Failed to load memories (${res.status})`);
         const data = (await res.json()) as MemoriesJson;
         if (!alive) return;
@@ -131,6 +134,7 @@ export function MapClient() {
         <div className="relative z-0 h-[62vh] min-h-[420px] overflow-hidden rounded-[1.6rem]">
           <MapView
             memories={filtered}
+            precomputedClusters={clustered}
             selectedId={selectedLocationId}
             onSelect={(locationId) => setSelectedLocationId(locationId)}
             groupNearby
@@ -161,11 +165,13 @@ export function MapClient() {
         </div>
       </Card>
 
-      <MemoryModal
-        open={!!selectedLocationId}
-        cluster={selectedCluster}
-        onClose={() => setSelectedLocationId(undefined)}
-      />
+      {selectedLocationId ? (
+        <MemoryModal
+          open={!!selectedLocationId}
+          cluster={selectedCluster}
+          onClose={() => setSelectedLocationId(undefined)}
+        />
+      ) : null}
     </div>
   );
 }

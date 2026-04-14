@@ -130,7 +130,7 @@ function ClusterCarousel({
         <div className="flex h-[50vh] min-h-[280px] w-full items-center justify-center p-2 sm:h-[58vh]">
           <AnimatePresence mode="wait">
             <motion.div
-              key={current.id}
+              key={`${current.id}|${current.file}`}
               className="relative h-full w-full"
               initial={{ opacity: 0, scale: 0.985 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -175,7 +175,7 @@ function ClusterCarousel({
         <div className="mt-3 flex items-center justify-center gap-1.5">
           {cluster.photos.map((p, i) => (
             <button
-              key={p.id}
+              key={`${p.id}|${p.file}`}
               type="button"
               aria-label={`Go to photo ${i + 1}`}
               onClick={() => setIndex(i)}
