@@ -63,36 +63,6 @@ h3 {
   opacity: 0.18;
 }
 
-.timeline-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: #ffffff;
-  border: 2px solid #8b5cf6;
-  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.45);
-}
-
-.timeline-range::-moz-range-thumb {
-  cursor: pointer;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: #ffffff;
-  border: 2px solid #8b5cf6;
-  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.45);
-}
-
-.timeline-range::-webkit-slider-runnable-track {
-  background: transparent;
-}
-
-.timeline-range::-moz-range-track {
-  background: transparent;
-}
-
 .romantic-map .leaflet-control-zoom {
   border: 0;
   box-shadow: 0 14px 30px -18px rgba(0, 0, 0, 0.45);

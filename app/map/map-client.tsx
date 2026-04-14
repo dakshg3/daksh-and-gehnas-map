@@ -5,8 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Memory, MemoryCluster } from "@/components/types";
 import { Card } from "@/components/ui";
-import { TimelineSlider } from "@/components/TimelineSlider";
-import { byDateAsc, clusterMemoriesByDistance, withinRange } from "@/components/utils";
+import { byDateAsc, clusterMemoriesByDistance } from "@/components/utils";
 import { applyDraftToMemories, loadDraftMemories } from "@/components/memoryDraft";
 
 const MapView = dynamic(() => import("@/components/MapView").then((m) => m.MapView), { ssr: false });
@@ -21,8 +20,6 @@ const CLUSTER_DISTANCE_METERS = 900;
 export function MapClient() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>(undefined);
-  const [timelineStart, setTimelineStart] = useState<string>("");
-  const [timelineEnd, setTimelineEnd] = useState<string>("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -39,9 +36,6 @@ export function MapClient() {
         const base = (Array.isArray(data) ? data : []).slice().sort(byDateAsc);
         const withDraft = applyDraftToMemories(base, loadDraftMemories()).slice().sort(byDateAsc);
         setMemories(withDraft);
-        const dated = withDraft.map((m) => m.date).filter(Boolean);
-        setTimelineStart(dated[0] ?? "");
-        setTimelineEnd(dated.slice(-1)[0] ?? "");
         setStatus("ready");
       } catch {
         if (!alive) return;
@@ -57,14 +51,9 @@ export function MapClient() {
     };
   }, [reloadKey]);
 
-  const filtered = useMemo(() => {
-    if (!timelineStart && !timelineEnd) return memories;
-    return memories.filter((m) => !m.date || withinRange(m.date, timelineStart, timelineEnd));
-  }, [memories, timelineStart, timelineEnd]);
-
   const clustered = useMemo<MemoryCluster[]>(
-    () => clusterMemoriesByDistance(filtered, CLUSTER_DISTANCE_METERS),
-    [filtered]
+    () => clusterMemoriesByDistance(memories, CLUSTER_DISTANCE_METERS),
+    [memories]
   );
 
   const selectedCluster = useMemo(
@@ -133,7 +122,7 @@ export function MapClient() {
       <div className="rounded-[2rem] bg-white/70 p-2 shadow-[0_24px_60px_-40px_rgba(0,0,0,0.4)] ring-1 ring-white/60 backdrop-blur">
         <div className="relative z-0 h-[62vh] min-h-[420px] overflow-hidden rounded-[1.6rem]">
           <MapView
-            memories={filtered}
+            memories={memories}
             precomputedClusters={clustered}
             selectedId={selectedLocationId}
             onSelect={(locationId) => setSelectedLocationId(locationId)}
@@ -147,20 +136,9 @@ export function MapClient() {
       </div>
 
       <Card className="p-4">
-        <div className="text-sm font-semibold">Timeline</div>
-        <div className="mt-3">
-          <TimelineSlider
-            memories={memories}
-            startValue={timelineStart}
-            endValue={timelineEnd}
-            onChange={(startDate, endDate) => {
-              setTimelineStart(startDate);
-              setTimelineEnd(endDate);
-            }}
-          />
-        </div>
-        <div className="mt-3 text-xs text-zinc-600">
-          Showing <span className="font-medium">{filtered.length}</span> memories in{" "}
+        <div className="text-sm font-semibold">Overview</div>
+        <div className="mt-2 text-xs text-zinc-600">
+          Showing <span className="font-medium">{memories.length}</span> memories in{" "}
           <span className="font-medium">{clustered.length}</span> locations.
         </div>
       </Card>

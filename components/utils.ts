@@ -8,21 +8,6 @@ export function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-export function getDateRange(memories: Memory[]) {
-  const dates = memories.map((m) => m.date).filter(Boolean).sort();
-  return {
-    min: dates[0] ?? "",
-    max: dates[dates.length - 1] ?? "",
-  };
-}
-
-export function withinRange(date: string, min: string, max: string) {
-  if (!date) return false;
-  if (min && date < min) return false;
-  if (max && date > max) return false;
-  return true;
-}
-
 export function formatPrettyDate(date: string) {
   if (!date) return "";
   const [y, m, d] = date.split("-").map(Number);

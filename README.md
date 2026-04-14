@@ -10,7 +10,7 @@ A romantic, gift-worthy memory map that visualizes a couple’s photos on an int
 
 - **Preprocessing script**: scan photos, extract EXIF date + GPS, reverse-geocode to a place name, and write `data/memories.json`
 - **Metadata Review UI** (`/review`): edit date, caption, and location (search or click to drop a pin)
-- **Interactive Story Map** (`/map`): clustered heart pins, memory modal, optional chronological path, timeline filter
+- **Interactive Story Map** (`/map`): clustered heart pins, memory modal, optional chronological path
 
 ## Add photos
 
