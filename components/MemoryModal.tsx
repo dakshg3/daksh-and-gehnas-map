@@ -25,6 +25,8 @@ function ClusterCarousel({
   const total = cluster.photos.length;
   const safeIndex = total ? Math.max(0, Math.min(index, total - 1)) : 0;
   const current = cluster.photos[safeIndex];
+  const nextPhoto = total > 1 ? cluster.photos[(safeIndex + 1) % total] : undefined;
+  const prevPhoto = total > 1 ? cluster.photos[(safeIndex - 1 + total) % total] : undefined;
 
   function go(delta: number) {
     if (total <= 1) return;
@@ -47,6 +49,18 @@ function ClusterCarousel({
   useEffect(() => {
     dialogRef.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (total <= 1) return;
+    const preloadFiles = [nextPhoto?.file, prevPhoto?.file].filter(Boolean) as string[];
+
+    for (const src of preloadFiles) {
+      const img = new window.Image();
+      img.decoding = "async";
+      img.loading = "eager";
+      img.src = src;
+    }
+  }, [nextPhoto?.file, prevPhoto?.file, total]);
 
   function trapTabKey(e: ReactKeyboardEvent<HTMLDivElement>) {
     if (e.key !== "Tab") return;
@@ -143,7 +157,8 @@ function ClusterCarousel({
                 fill
                 sizes="(max-width: 640px) 100vw, 960px"
                 className="object-contain"
-                priority
+                priority={safeIndex === 0}
+                loading={safeIndex === 0 ? "eager" : "lazy"}
               />
             </motion.div>
           </AnimatePresence>

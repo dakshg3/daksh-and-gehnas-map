@@ -20,6 +20,9 @@ const OSM_STANDARD = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 const OVERLAP_ZOOM_STEP = 2;
 const OVERLAP_MAX_ZOOM = 16;
 const OVERLAP_PIXEL_THRESHOLD = 30;
+const MARKER_CLICK_THROTTLE_MS = 220;
+const SELECT_AFTER_FLY_FALLBACK_MS = 850;
+const FLY_DURATION_SECONDS = 0.55;
 
 const photoPinIconCache = new Map<string, L.DivIcon>();
 
@@ -193,6 +196,17 @@ export function MapView({
       }));
   }, [groupNearby, groupDistanceMeters, memories, precomputedClusters]);
   const mapRef = useRef<L.Map | null>(null);
+  const lastMarkerClickAtRef = useRef(0);
+  const lastMarkerIdRef = useRef<string | null>(null);
+  const selectTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (selectTimeoutRef.current != null) {
+        window.clearTimeout(selectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const path = useMemo(() => {
     if (!showPath) return null;
@@ -269,11 +283,29 @@ export function MapView({
             eventHandlers={{
               click: () => {
                 const map = mapRef.current;
+                const now = Date.now();
 
                 if (!map) {
                   onSelect?.(cluster.locationId);
                   return;
                 }
+
+                const repeatedSameMarker =
+                  lastMarkerIdRef.current === cluster.locationId &&
+                  now - lastMarkerClickAtRef.current < MARKER_CLICK_THROTTLE_MS;
+
+                if (repeatedSameMarker) return;
+
+                lastMarkerClickAtRef.current = now;
+                lastMarkerIdRef.current = cluster.locationId;
+
+                if (selectTimeoutRef.current != null) {
+                  window.clearTimeout(selectTimeoutRef.current);
+                  selectTimeoutRef.current = null;
+                }
+
+                // Stop any in-progress fly animation before applying a new target.
+                map.stop();
 
                 const currentZoom = map.getZoom();
                 const shouldZoomForOverlap =
@@ -283,13 +315,43 @@ export function MapView({
                   ? Math.min(currentZoom + OVERLAP_ZOOM_STEP, OVERLAP_MAX_ZOOM)
                   : currentZoom;
 
-                map.flyTo([cluster.latitude, cluster.longitude], nextZoom, {
-                  animate: true,
-                  duration: 0.65,
-                });
+                const target = L.latLng(cluster.latitude, cluster.longitude);
+                const distanceToTarget = map.getCenter().distanceTo(target);
+                const requiresMotion = nextZoom !== currentZoom || distanceToTarget > 4;
+                const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+                if (!requiresMotion) {
+                  if (!shouldZoomForOverlap) onSelect?.(cluster.locationId);
+                  return;
+                }
+
+                const runFlyTo = () => {
+                  map.flyTo([cluster.latitude, cluster.longitude], nextZoom, {
+                    animate: !prefersReducedMotion,
+                    duration: prefersReducedMotion ? 0 : FLY_DURATION_SECONDS,
+                  });
+                };
+
+                runFlyTo();
 
                 if (shouldZoomForOverlap) return;
-                window.setTimeout(() => onSelect?.(cluster.locationId), 280);
+
+                let selected = false;
+                const selectOnce = () => {
+                  if (selected) return;
+                  selected = true;
+                  if (selectTimeoutRef.current != null) {
+                    window.clearTimeout(selectTimeoutRef.current);
+                    selectTimeoutRef.current = null;
+                  }
+                  onSelect?.(cluster.locationId);
+                };
+
+                map.once("moveend", selectOnce);
+                selectTimeoutRef.current = window.setTimeout(() => {
+                  map.off("moveend", selectOnce);
+                  selectOnce();
+                }, SELECT_AFTER_FLY_FALLBACK_MS);
               },
             }}
             opacity={selectedId && selectedId !== cluster.locationId ? 0.75 : 1}
